@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crowd top 5 reveal</title>
+<link rel="stylesheet" href="../brand/tokens.css">
+<link rel="stylesheet" href="../lib/crowd.css">
+<style>
+  .row-x { transition: opacity 0.45s ease; }
+  #loading { position: absolute; left: 120px; top: 300px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <svg class="g" id="g" viewBox="0 0 1920 1080"></svg>
+  <div id="txt"></div>
+  <div class="t-title" id="title"></div>
+  <div class="t-src" id="src"></div>
+</div>
+<!-- shared contract: crowd/config.js (vote branch) sets window.CROWD_CONFIG; missing = defaults -->
+<script src="../config.js" onerror="void 0"></script>
+<script src="../fixtures/meta.js"></script>
+<script src="../lib/tally.js"></script>
+<script src="../lib/sheet.js"></script>
+<script src="../lib/stage.js"></script>
+<script>
+/* Crowd top-5 reveal. On arrival: one fetch of the Sheet, then FROZEN (R reloads by hand).
+   Beats (live):  1 the crowd's top 5 (Borda bars, N votes)
+                  2 the leaderboard's top 5 beside it, with #6 just under the cut; 95% ranges; "too close to call" bands
+                  3 lines from each crowd pick to its real place (picks outside the top 5 go off to their real rank, red)
+                  4 % who put the real #1 first   5 how many named all five   6 the closest guess's name
+   Fallback (no votes, or the Sheet can't be read): the leaderboard's top 5 alone, one beat, no error text.
+   ?wait=1: don't fetch until the deck posts {crowd: "load"} (so an iframe loaded early doesn't freeze an empty sheet). */
+(function () {
+  "use strict";
+  const S = CrowdStage, g = document.getElementById("g"), T = document.getElementById("txt");
+  const titleEl = document.getElementById("title"), srcEl = document.getElementById("src");
+  const Q = new URLSearchParams(location.search);
+  const COL = { ink: "#3B1E1C", muted: "#8A7972", rule: "#D9D3C4", slot: "#E4DFD2", blue: "#80A0D8", red: "#FF4F2C",
+    green: "#CFF29E" };
+  const els = [];          // {el, from, until, cls}: shown in beats [from, until)
+  const add = (el, from, until, opt) => { els.push(Object.assign({ el, from, until: until == null ? 99 : until }, opt || {})); return el; };
+  const titles = [];       // [fromBeat, text]
+  const sources = [];
+
+  function show(b, instant) {
+    if (instant) document.documentElement.classList.add("still");
+    for (const x of els) {
+      const on = b >= x.from && b < x.until;
+      x.el.classList.toggle("on", on);
+      x.el.classList.toggle("dim", on && x.dimFrom != null && b >= x.dimFrom);
+    }
+    const pick = (list) => { let t = ""; for (const [f, s] of list) if (b >= f) t = s; return t; };
+    swap(titleEl, pick(titles)); swap(srcEl, pick(sources));
+    if (instant) requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (!Q.get("still")) document.documentElement.classList.remove("still");
+    }));
+  }
+  function swap(el, t) {
+    if (el.dataset.t === t) return;
+    el.dataset.t = t;
+    if (document.documentElement.classList.contains("still") || !el.textContent) { el.textContent = t; el.style.opacity = 1; return; }
+    el.style.opacity = 0;
+    setTimeout(() => { if (el.dataset.t === t) { el.textContent = t; el.style.opacity = 1; } }, 330);
+  }
+  function clear() { g.innerHTML = ""; T.innerHTML = ""; els.length = 0; titles.length = 0; sources.length = 0; }
+
+  const fmtDate = (s) => {
+    const m = /(\d{4})-(\d{2})-(\d{2})/.exec(s || "");
+    return m ? `${+m[3]} ${"Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ")[+m[2] - 1]} ${m[1]}` : "";
+  };
+  const cleanName = (s) => {
+    let t = String(s || "").replace(/\s+/g, " ").trim();
+    return t.length > 36 ? t.slice(0, 35) + "…" : t;
+  };
+
+  /* consecutive rows whose 95% ranges share a common stretch: [{a, b, lo, hi}] (rows a..b, size >= 2) */
+  function closeGroups(rows) {
+    const out = [];
+    let i = 0;
+    while (i < rows.length) {
+      if (!rows[i].ci) { i++; continue; }
+      let lo = rows[i].ci[0], hi = rows[i].ci[1], j = i;
+      while (j + 1 < rows.length && rows[j + 1].ci && Math.max(lo, rows[j + 1].ci[0]) < Math.min(hi, rows[j + 1].ci[1])) {
+        j++; lo = Math.max(lo, rows[j].ci[0]); hi = Math.min(hi, rows[j].ci[1]);
+      }
+      if (j > i) out.push({ a: i, b: j, lo, hi });
+      i = j + 1;
+    }
+    return out;
+  }
+
+  /* the leaderboard board: top 5, the cut, #6 (just missed), with ranges and "too close to call" bands.
+     G: {x0, x1, rankR, nameX, tx0, tx1, y0, P, fs, rfs}; from = beat it appears in. Returns rowY(i). */
+  function realBoard(M, G, from, opt) {
+    const rows = M.rows6, rowY = (i) => G.y0 + G.P * (i + 0.5);
+    const ci = rows.filter((m) => m.ci);
+    const d0 = Math.floor(Math.min(...ci.map((m) => m.ci[0])) - 0.5), d1 = Math.ceil(Math.max(...ci.map((m) => m.ci[1])) + 0.5);
+    const X = (v) => G.tx0 + ((v - d0) / (d1 - d0)) * (G.tx1 - G.tx0);
+    add(S.text(T, G.x0, G.headY, "Leaderboard", "t-head bt"), from);
+    // legend: a green swatch + "too close to call" (only when a band exists)
+    const groups = closeGroups(rows);
+    if (groups.length) {
+      const lg = S.text(T, G.x1, G.headY, "too close to call", "t-small bt", [1, 0.5]);
+      lg.style.paddingLeft = "40px";
+      lg.insertAdjacentHTML("afterbegin", `<span style="position:absolute;left:0;top:50%;width:26px;height:26px;margin-top:-13px;background:${COL.green}"></span>`);
+      add(lg, from, null, { delay: 1.1 });
+      lg.style.transitionDelay = "1.1s";
+    }
+    // bands behind the rows (drawn first)
+    const bandG = S.svg(g, "g", {});
+    groups.forEach((q) => {
+      const y = rowY(q.a) - G.P / 2 + 5, h = (q.b - q.a + 1) * G.P - 10;
+      const r = S.svg(bandG, "rect", { x: X(q.lo), y, width: Math.max(4, X(q.hi) - X(q.lo)), height: h, fill: COL.green, class: "bt" });
+      r.style.transitionDelay = "1.1s";
+      add(r, from);
+    });
+    rows.forEach((m, i) => {
+      const y = rowY(i), d = (0.08 * i).toFixed(2) + "s", miss = i >= 5;
+      const rk = S.text(T, G.rankR, y, String(m.real_rank), "t-rank bt", [1, 0.5]);
+      const nm = S.text(T, G.nameX, y, m.name, "t-name bt" + (miss ? " mute" : ""), [0, 0.5]);
+      rk.style.fontSize = G.rfs + "px"; nm.style.fontSize = G.fs + "px";
+      [rk, nm].forEach((e) => { e.style.transitionDelay = d; add(e, from); });
+      M.rankEl[m.id] = rk;
+      // the track and the 95% range: a bar from lo to hi with ink caps
+      const tr = S.svg(g, "rect", { x: G.tx0, y: y - G.t / 2, width: G.tx1 - G.tx0, height: G.t, fill: COL.slot, class: "bt" });
+      tr.style.transitionDelay = d; add(tr, from);
+      if (m.ci) {
+        const x0 = X(m.ci[0]), x1 = X(m.ci[1]), gr = S.svg(g, "g", { class: "bt" }), op = miss ? 0.5 : 1;
+        S.svg(gr, "rect", { x: x0, y: y - G.t / 2, width: x1 - x0, height: G.t, fill: COL.blue, opacity: op });
+        S.svg(gr, "rect", { x: x0 - 1.5, y: y - G.t / 2 - 7, width: 3, height: G.t + 14, fill: COL.ink, opacity: op });
+        S.svg(gr, "rect", { x: x1 - 1.5, y: y - G.t / 2 - 7, width: 3, height: G.t + 14, fill: COL.ink, opacity: op });
+        gr.style.transitionDelay = (0.5 + 0.08 * i).toFixed(2) + "s"; add(gr, from);
+      }
+      // rules under rows; the cut under #5 is an ink line
+      if (i < rows.length - 1 || opt.ruleLast) {
+        const cut = i === 4, ry = y + G.P / 2;
+        const ln = S.svg(g, "line", { x1: G.x0, x2: G.x1, y1: ry, y2: ry, stroke: cut ? COL.ink : COL.rule,
+          "stroke-width": cut ? 3 : 1.5, class: "bt" });
+        ln.style.transitionDelay = cut ? "0.6s" : d; add(ln, from);
+      }
+    });
+    return rowY;
+  }
+
+  function build(data) {
+    clear();
+    const res = data && data.result, models = (data && data.models) || window.CROWD_MODELS || window.CROWD_MODELS_FALLBACK;
+    const Mi = CrowdTally.modelIndex(models), byId = Mi.byId;
+    const sorted = Mi.list.slice().sort((a, b) => a.real_rank - b.real_rank);
+    const top = Mi.realTop, miss = sorted.find((m) => !m.in_top5);
+    const M = { rows6: miss ? top.concat([miss]) : top.slice(), rankEl: {} };
+    const date = fmtDate(models.snapshot);
+    const srcBoard = `Leaderboard: best model per family${date ? ", " + date : ""} · bars: 95% range of the win rate, our estimate`;
+
+    if (!res || !res.n) {                                    // fallback: the real top 5 alone
+      titles.push([0, "Our top 5"]);
+      sources.push([0, srcBoard]);
+      const G = { x0: 460, x1: 1460, rankR: 510, nameX: 556, tx0: 1060, tx1: 1460, headY: 300, y0: 360, P: 96, t: 24, fs: 52, rfs: 40 };
+      realBoard(M, G, 0, {});
+      S.start(1, show);
+      return;
+    }
+
+    const crowd = res.board.slice(0, 5).map((x) => Object.assign({}, x, { m: byId.get(x.id) }));
+    const extra = crowd.filter((x) => !x.m.in_top5 && (!miss || x.id !== miss.id)).map((x) => x.m).sort((a, b) => a.real_rank - b.real_rank);
+    // row pitch: the 6 rows (+ "⋮" and the extra picks, at 0.8 pitch) fit between y 330 and 950
+    const k = extra.length, P = Math.min(96, Math.floor(620 / (6 + (k ? 0.7 + 0.8 * k : 0))));
+    const fs = Math.round(Math.min(48, P * 0.56)), rfs = Math.round(Math.min(38, P * 0.44)), t = Math.round(Math.min(22, P * 0.26));
+    const L = { x0: 120, x1: 780, rankR: 156, nameX: 196, tx0: 500, tx1: 780, headY: 270, y0: 330, P, t };
+    const R = { x0: 1140, x1: 1800, rankR: 1180, nameX: 1216, tx0: 1500, tx1: 1800, headY: 270, y0: 330, P, t, fs, rfs };
+    const rowY = (i) => L.y0 + P * (i + 0.5);
+
+    titles.push([0, "Your top 5"], [1, "Your top 5 vs ours"], [3, "How close did you get"]);
+    sources.push([0, `${res.n} audience vote${res.n === 1 ? "" : "s"} · Borda count: 5 points for a #1 pick … 1 for #5`],
+      [1, srcBoard],
+      [3, ""], [5, "Closest guess: 1 point per pick in the top 5, 1 more at its exact place; a tie goes to the first to vote"]);
+
+    // ---- beat 1: the crowd's top 5 (until beat 4)
+    const B = 3;                                            // the boards leave at beat index 3
+    add(S.text(T, L.x0, L.headY, "You", "t-head bt"), 0, B);
+    add(S.text(T, L.x1, L.headY, `${res.n} vote${res.n === 1 ? "" : "s"}`, "t-small bt", [1, 0.5]), 0, B);
+    const full = 5 * res.n;
+    crowd.forEach((x, i) => {
+      const y = rowY(i), d = (0.12 * i).toFixed(2) + "s";
+      const rk = S.text(T, L.rankR, y, String(i + 1), "t-rank bt", [1, 0.5]);
+      const nm = S.text(T, L.nameX, y, x.m.name, "t-name bt", [0, 0.5]);
+      rk.style.fontSize = rfs + "px"; nm.style.fontSize = fs + "px";
+      [rk, nm].forEach((e) => { e.style.transitionDelay = d; add(e, 0, B); });
+      const tr = S.svg(g, "rect", { x: L.tx0, y: y - t / 2, width: L.tx1 - L.tx0, height: t, fill: COL.slot, class: "bt" });
+      tr.style.transitionDelay = d; add(tr, 0, B);
+      const bar = S.svg(g, "rect", { x: L.tx0, y: y - t / 2, width: Math.max(2, ((L.tx1 - L.tx0) * x.points) / full), height: t,
+        fill: COL.blue, class: "grow" });
+      bar.style.transitionDelay = (0.25 + 0.12 * i).toFixed(2) + "s"; add(bar, 0, B);
+      if (i < 4) {
+        const ln = S.svg(g, "line", { x1: L.x0, x2: L.x1, y1: y + P / 2, y2: y + P / 2, stroke: COL.rule, "stroke-width": 1.5, class: "bt" });
+        ln.style.transitionDelay = d; add(ln, 0, B);
+      }
+    });
+
+    // ---- beat 2: the leaderboard beside it
+    const startEls = els.length;
+    const rY = realBoard(M, R, 1, {});
+    for (let j = startEls; j < els.length; j++) els[j].until = B;
+
+    // ---- beat 3: lines; picks outside the top 6 rows get their own row after "⋮"
+    const yOf = new Map(M.rows6.map((m, i) => [m.id, rY(i)]));
+    if (k) {
+      const yDots = R.y0 + 6 * P + 0.32 * P;
+      add(S.text(T, R.rankR - 12, yDots, "⋮", "t-rank bt", [0.5, 0.5]), 2, B);
+      extra.forEach((m, j) => {
+        const y = R.y0 + 6 * P + 0.7 * P + 0.8 * P * (j + 0.5);
+        yOf.set(m.id, y);
+        const rk = S.text(T, R.rankR, y, String(m.real_rank), "t-rank bt red", [1, 0.5]);
+        const nm = S.text(T, R.nameX, y, m.name, "t-name bt mute", [0, 0.5]);
+        rk.style.fontSize = rfs + "px"; nm.style.fontSize = Math.round(fs * 0.9) + "px";
+        [rk, nm].forEach((e) => { e.style.transitionDelay = (0.5 + 0.12 * j).toFixed(2) + "s"; add(e, 2, B); });
+      });
+    }
+    crowd.forEach((x, i) => {
+      const y1 = rowY(i), y2 = yOf.get(x.id), real = x.m.real_rank;
+      const exact = x.m.in_top5 && real === i + 1, inTop = x.m.in_top5;
+      const xa = L.x1 + 22, xb = R.x0 - 18, len = Math.hypot(xb - xa, y2 - y1);
+      const ln = S.svg(g, "line", { x1: xa, y1, x2: xb, y2, stroke: inTop ? (exact ? COL.ink : COL.muted) : COL.red,
+        "stroke-width": exact ? 6 : 3.5, "stroke-linecap": "round", class: "draw" });
+      ln.style.setProperty("--len", len.toFixed(1));
+      ln.style.transitionDelay = (0.15 * i).toFixed(2) + "s";
+      add(ln, 2, B);
+      if (!inTop && M.rankEl[x.id]) {                       // #6 picked: its rank turns red with the line
+        const r6 = M.rankEl[x.id].cloneNode(true);
+        r6.classList.add("red"); r6.classList.remove("on"); r6.style.transitionDelay = "0.5s";
+        T.appendChild(r6); add(r6, 2, B);
+      }
+    });
+
+    // ---- beats 4-6: the numbers and the closest guess
+    const no1 = top[0], pct = Math.round((100 * res.no1) / res.n);
+    const s1 = S.text(T, 120, 300, `${pct}%`, "t-big bt", [0, 0]);
+    add(s1, 3);
+    add(S.text(T, 126, 500, `put ${no1.name} at #1`, "t-say bt", [0, 0]), 3).style.transitionDelay = "0.15s";
+    add(S.text(T, 1000, 300, String(res.all5), "t-big bt", [0, 0]), 4);
+    add(S.text(T, 1006, 500, `of ${res.n} named all five`, "t-say bt", [0, 0]), 4).style.transitionDelay = "0.15s";
+    const cg = res.closest;
+    if (cg) {
+      add(S.svg(g, "line", { x1: 120, x2: 1800, y1: 640, y2: 640, stroke: COL.rule, "stroke-width": 1.5, class: "bt" }), 5);
+      add(S.text(T, 120, 712, "Closest guess", "t-kick bt", [0, 0.5]), 5);
+      const nm = add(S.text(T, 120, 760, cleanName(cg.ballot.name), "t-hero bt", [0, 0]), 5);
+      nm.style.transitionDelay = "0.25s";
+      // their five picks, in order: in the top 5 ink, at the exact place bold, elsewhere muted
+      const pk = document.createElement("div");
+      pk.className = "lab t-small bt"; pk.style.left = "124px"; pk.style.top = "920px";
+      pk.innerHTML = cg.ballot.picks.map((id, i) => {
+        const m = byId.get(id), ok = m.in_top5, ex = ok && m.real_rank === i + 1;
+        return `<span class="t-mono" style="color:var(--muted)">${i + 1}</span>&nbsp;<span style="color:${ok ? "var(--ink)" : "var(--muted)"};font-weight:${ex ? 700 : 500}">${S.esc(m.name)}</span>`;
+      }).join('<span style="color:var(--tg-rule)">&ensp;·&ensp;</span>');
+      pk.style.transitionDelay = "0.6s";
+      T.appendChild(pk); add(pk, 5);
+    }
+    S.start(cg ? 6 : 5, show);
+    fitHero();
+  }
+
+  // shrink a long closest-guess name to the stage width
+  function fitHero() {
+    document.fonts.ready.then(() => {
+      for (const x of els) if (x.el.classList && x.el.classList.contains("t-hero")) {
+        const w = x.el.getBoundingClientRect().width / (document.getElementById("stage").getBoundingClientRect().width / 1920);
+        if (w > 1680) x.el.style.fontSize = Math.floor(132 * 1680 / w) + "px";
+      }
+    });
+  }
+
+  let loading = false;
+  async function load() {
+    if (loading) return;
+    loading = true;
+    clear(); titleEl.textContent = ""; titleEl.dataset.t = "";
+    swap(titleEl, "Your top 5");
+    let data = null;
+    try { data = await CrowdSheet.load({ timeout: 4000, retries: 2 }); } catch (e) { data = { models: await CrowdSheet.models() }; }
+    await document.fonts.ready;
+    build(data);
+    loading = false;
+  }
+  S.hooks.r = S.hooks.R = load;
+  S.hooks.load = load;
+  window.crowdReveal = { load };
+  if (!Q.get("wait") && !window.CROWD_WAIT) load();
+})();
+</script>
+</body>
+</html>

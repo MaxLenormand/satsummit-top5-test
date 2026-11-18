@@ -1,0 +1,46 @@
+/* Taylor Geospatial brand tokens for slides (light theme).
+   Source: taylor-geospatial-brand/brand.json + brand_guidelines.txt.
+   Never #000 / #fff. Red is scarce: the one thing that is wrong or highlighted. */
+
+/* ---- fonts
+   They are never copied into this repo. When the link is missing (any other machine), the browser
+   falls back to the brand's approved stand-ins, Open Sans + Inconsolata, which ship in brand/fonts/. */
+@font-face { font-family: "Open Sans TG"; src: url("fonts/OpenSans.ttf") format("truetype"); font-weight: 300 800; font-display: block; }
+@font-face { font-family: "Inconsolata TG"; src: url("fonts/Inconsolata.ttf") format("truetype"); font-weight: 200 900; font-display: block; }
+
+:root {
+  /* brand palette */
+  --tg-brown: #3B1E1C;
+  --tg-ivory: #F4F4EB;
+  --tg-periwinkle: #80A0D8;
+  --tg-light-blue: #A7D0DC;
+  --tg-green: #CFF29E;       /* brand green: backgrounds only, it disappears on ivory */
+  --tg-red: #FF4F2C;
+
+  /* derived for the light theme (not brand colours; decided on the TG site, 2026-10-23) */
+  --tg-green-data: #7FB23A;  /* green for data on ivory */
+  --tg-ink-muted: #8A7972;   /* secondary text, axis labels */
+  --tg-rule: #D9D3C4;        /* hairlines, empty slots */
+  --tg-card: #FBFBF4;        /* raised card */
+  --tg-blue-data: #5E9BB0;   /* light blue, darkened enough to read on ivory */
+
+  /* roles */
+  --ground: var(--tg-ivory);
+  --ink: var(--tg-brown);
+  --muted: var(--tg-ink-muted);
+  --accent: var(--tg-periwinkle);
+  --alert: var(--tg-red);
+
+  --sans: "Degular", "Open Sans TG", "Open Sans", system-ui, sans-serif;
+  --mono: "Gintronic", "Inconsolata TG", "Inconsolata", ui-monospace, Menlo, monospace;
+
+  /* type scale, in stage pixels (the stage is always 1920 x 1080, then scaled to the screen).
+     Nothing on a slide goes below --t-min: it has to read from the back of a conference hall. */
+  --t-min: 28px;
+  --t-label: 32px;
+  --t-body: 44px;
+  --t-head: 68px;
+  --t-statement: 104px;
+  --t-number: 220px;
+  --margin: 120px;
+}

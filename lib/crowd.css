@@ -1,0 +1,43 @@
+/* Crowd top-5 slides: the deck's stage and chrome (tg-talk-3d/engine/deck.css), flat 2D.
+   Colours and fonts come from the deck's brand/tokens.css (linked by each page). Stage px at 1920 x 1080. */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--ground); overflow: hidden; }
+body { font-family: var(--sans); color: var(--ink); -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+#stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; background: var(--ground);
+  overflow: hidden; cursor: default; user-select: none; }
+#stage svg.g { position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: visible; }
+
+/* chrome, as the deck */
+.t-title { position: absolute; left: var(--margin); top: 92px; font-weight: 600; font-size: var(--t-head); line-height: 1.06;
+  letter-spacing: -0.015em; white-space: nowrap; transition: opacity 0.35s; }
+.t-src { position: absolute; left: var(--margin); bottom: 40px; max-width: 1520px; font-size: 26px; line-height: 1.25;
+  color: var(--muted); font-weight: 500; transition: opacity 0.4s; }
+
+/* text pieces placed in stage px (left/top set inline); one class each, as the deck's labels */
+.lab { position: absolute; white-space: nowrap; line-height: 1; }
+.t-head { font-weight: 500; font-size: 40px; }
+.t-name { font-weight: 500; font-size: 48px; }
+.t-rank { font: 400 38px/1 var(--mono); color: var(--muted); }
+.t-small { font-weight: 500; font-size: 30px; color: var(--muted); }
+.t-tick { font: 400 28px/1 var(--mono); color: var(--muted); letter-spacing: 0.02em; }
+.t-mono { font-family: var(--mono); }
+.t-big { font-weight: 600; font-size: 200px; line-height: 0.82; letter-spacing: -0.035em; font-feature-settings: "tnum" 1, "lnum" 1; }
+.t-say { font-weight: 500; font-size: 48px; line-height: 1.15; }
+.t-hero { font-weight: 600; font-size: 132px; line-height: 0.95; letter-spacing: -0.025em; }
+.t-kick { font: 500 30px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.t-kick::before { content: ""; display: inline-block; width: 16px; height: 16px; margin-right: 16px; vertical-align: 1px;
+  background: var(--tg-periwinkle); }
+.red { color: var(--alert); }
+.mute { color: var(--muted); }
+.ink { color: var(--ink); }
+
+/* beats: an element shows from its beat on (class "on"); fades and moves are CSS transitions */
+.bt { opacity: 0; transition: opacity 0.45s ease; }
+.bt.on { opacity: 1; }
+.bt.dim { opacity: 0.32; }
+.grow { transform: scaleX(0); transform-box: fill-box; transform-origin: 0 50%; transition: transform 0.7s cubic-bezier(.2,.7,.2,1), opacity 0.3s; }
+.grow.on { transform: scaleX(1); }
+.draw { opacity: 0; stroke-dasharray: var(--len) var(--len); stroke-dashoffset: var(--len);
+  transition: stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1), opacity 0s linear 0.8s; }
+.draw.on { opacity: 1; stroke-dashoffset: 0; transition: stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1), opacity 0s; }
+.still * { transition: none !important; }

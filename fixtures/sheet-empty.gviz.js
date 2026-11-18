@@ -1,0 +1,2 @@
+/*O_o*/
+crowdFixture({"version":"0.6","reqId":"0","status":"ok","sig":"1","table":{"cols":[{"id":"A","label":"Timestamp","type":"datetime","pattern":"M/d/yyyy H:mm:ss"},{"id":"B","label":"rank1","type":"string"},{"id":"C","label":"rank2","type":"string"},{"id":"D","label":"rank3","type":"string"},{"id":"E","label":"rank4","type":"string"},{"id":"F","label":"rank5","type":"string"},{"id":"G","label":"name","type":"string"},{"id":"H","label":"device","type":"string"},{"id":"I","label":"","type":"string"}],"rows":[],"parsedNumHeaders":1}});
