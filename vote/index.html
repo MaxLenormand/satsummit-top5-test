@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F4EB">
+<meta name="color-scheme" content="light only">
+<meta name="robots" content="noindex">
+<title>Guess the top 5</title>
+<style>
+:root {
+--brown: #3B1E1C; --ivory: #F4F4EB; --peri: #80A0D8; --red: #FF4F2C;
+--muted: #8A7972; --rule: #D9D3C4; --card: #FBFBF4; --peri-wash: #E6ECF4;
+--sans: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+--mono: "Inconsolata", ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
+--ease: cubic-bezier(.2, .9, .3, 1.25);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+margin: 0; background: var(--ivory); color: var(--brown); font: 15px/1.35 var(--sans);
+-webkit-tap-highlight-color: transparent; overflow-x: hidden;
+}
+button, input { font: inherit; color: inherit; }
+button { -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 0; cursor: pointer; touch-action: manipulation; }
+.wrap {
+max-width: 480px; margin: 0 auto;
+padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+header { display: flex; align-items: center; justify-content: space-between; height: 22px; margin-bottom: 14px; }
+.logo { height: 14px; width: auto; fill: var(--brown); display: block; }
+.tag { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+h1 { font-size: 27px; line-height: 1.1; font-weight: 700; letter-spacing: -.015em; margin: 0 0 4px; }
+.lead { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+.lead b { color: var(--brown); font-weight: 600; }
+
+/* ---- the 10 cards */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
+.card {
+position: relative; display: flex; flex-direction: column; justify-content: center; text-align: left;
+width: 100%; min-height: 62px; padding: 9px 8px 9px 12px; border-radius: 12px;
+background: var(--card); box-shadow: inset 0 0 0 1px var(--rule);
+transition: transform .12s ease, opacity .2s ease, background-color .15s ease, box-shadow .15s ease;
+-webkit-user-select: none; user-select: none;
+}
+.card:active { transform: scale(.965); }
+.card .nm { font-size: 16px; font-weight: 650; line-height: 1.15; overflow-wrap: anywhere; padding-right: 24px; }
+.card .md {
+font: 11.5px/1.25 var(--mono); letter-spacing: -.01em; color: var(--muted); margin-top: 3px;
+display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.card[aria-pressed="true"] { background: var(--peri-wash); box-shadow: inset 0 0 0 2px var(--brown); }
+.card .badge {
+position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%;
+box-shadow: inset 0 0 0 1.5px var(--rule); font: 700 13px/22px var(--sans); text-align: center; color: transparent;
+}
+.card[aria-pressed="true"] .badge { background: var(--brown); color: var(--ivory); box-shadow: none; animation: pop .32s var(--ease); }
+.card[data-first] .badge { background: var(--red); }
+.card .badge.bump { animation: bump .28s var(--ease); }
+.full .card[aria-pressed="false"] { opacity: .38; }
+.full .card[aria-pressed="false"]:active { transform: none; }
+@keyframes pop { 0% { transform: scale(.3); } 100% { transform: scale(1); } }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }
+.grid.nudge { animation: nudge .36s ease; }
+@keyframes nudge { 20% { transform: translateX(-5px); } 45% { transform: translateX(5px); } 70% { transform: translateX(-3px); } 100% { transform: none; } }
+
+/* ---- name + submit */
+label.f { display: block; font-weight: 600; font-size: 14px; margin: 0 0 6px; }
+label.f span { font-weight: 400; color: var(--muted); }
+input#name {
+display: block; width: 100%; height: 48px; padding: 0 14px; font-size: 16px; /* 16px: no iOS zoom */
+border: 0; border-radius: 12px; background: var(--card); box-shadow: inset 0 0 0 1px var(--rule); outline: none;
+transition: box-shadow .15s ease;
+}
+input#name:focus { box-shadow: inset 0 0 0 2px var(--peri); }
+input#name.nudge { animation: nudge .36s ease; box-shadow: inset 0 0 0 2px var(--red); }
+.btn {
+display: block; width: 100%; height: 54px; margin-top: 12px; border-radius: 14px;
+background: var(--brown); color: var(--ivory); font-size: 17px; font-weight: 700; letter-spacing: .005em;
+transition: transform .12s ease, background-color .2s ease, color .2s ease;
+}
+.btn:active { transform: scale(.98); }
+.btn.wait { background: var(--rule); color: var(--brown); }
+.btn.ghost { background: transparent; color: var(--brown); box-shadow: inset 0 0 0 1.5px var(--brown); height: 48px; font-size: 16px; }
+
+/* ---- locked in */
+#done { text-align: center; padding-top: 6px; }
+.mark { width: 76px; height: 76px; display: block; margin: 10px auto 10px; fill: var(--brown); overflow: visible; }
+.mark g { transform-box: view-box; transform-origin: 108px 108px; }
+.go .mark .c { animation: lockC .6s var(--ease) both; }
+.go .mark .a { animation: lockA .5s .18s cubic-bezier(.2, .8, .3, 1) both; }
+@keyframes lockC { 0% { transform: scale(1.6) rotate(-12deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes lockA { 0% { transform: scale(.4); opacity: 0; } 100% { transform: none; opacity: 1; } }
+#done h1 { font-size: 30px; }
+#who { color: var(--muted); margin: 0 0 18px; overflow-wrap: anywhere; }
+ol.picks { list-style: none; margin: 0 auto 16px; padding: 0; max-width: 340px; text-align: left; }
+ol.picks li {
+display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 6px;
+background: var(--card); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--rule);
+}
+.go ol.picks li { animation: rise .35s cubic-bezier(.2, .8, .3, 1) both; }
+ol.picks li .n { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--brown); color: var(--ivory); font: 700 13px/24px var(--sans); text-align: center; }
+ol.picks li:first-child .n { background: var(--red); }
+ol.picks li .t { min-width: 0; }
+ol.picks li .t b { display: block; font-weight: 650; font-size: 16px; line-height: 1.2; }
+ol.picks li .t i { display: block; font: normal 11.5px/1.25 var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes rise { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+.status { display: inline-flex; align-items: center; gap: 8px; font: 500 12px/1 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; min-height: 16px; }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--rule); }
+.status[data-s="sent"]::before { background: #7FB23A; }
+.status[data-s="sending"]::before { background: var(--peri); animation: blink 1s ease-in-out infinite; }
+.status[data-s="wait"]::before { background: var(--red); animation: blink 1.4s ease-in-out infinite; }
+.status[data-s="dry"]::before { background: var(--peri); }
+@keyframes blink { 50% { opacity: .25; } }
+.hint { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
+[hidden] { display: none !important; }
+
+@media (max-height: 680px) {
+header { margin-bottom: 10px; }
+h1 { font-size: 24px; }
+.lead { margin-bottom: 10px; }
+.card { min-height: 56px; padding-top: 7px; padding-bottom: 7px; }
+.grid { gap: 7px; }
+}
+@media (prefers-reduced-motion: reduce) {
+*, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<svg class="logo" viewBox="0 0 753.1 81.1" role="img" aria-label="Taylor Geospatial"><path d="M117.4,20.7h33.4v4.2h-14.3v37.9h-4.9V24.9h-14.2s0-4.2,0-4.2Z"/><path d="M170.4,43.6l10.7-.6v-2c0-6.2-3.1-8.7-9.2-8.7s-8.1.8-10,1.3l-.4-4.4c1-.3,5.2-1.1,10.4-1.1,9.8,0,14,4.2,14,12.7v10.3c0,3.9.5,8,1.1,11.7l-3.6.6c-.6-2.5-1.1-5-1.4-7.5h-.2c-2.1,5.3-6.8,7.7-12.2,7.7s-10.9-4.2-10.9-10.4,3.3-9,11.8-9.4v-.2ZM170.4,59.4c5,0,10.6-3.4,10.6-9.1v-3.8l-9.4.6c-6.6.4-8.2,2.9-8.2,5.9,0,4.3,2.6,6.4,7,6.4h0Z"/><path d="M201.4,75.8c-2,0-3.6-.3-5.3-.8l.4-4.4c1.4.4,3.2.9,5.1.9,4.5,0,7.2-1.6,9.6-7.4l-14.3-35,4.9-.8,7.9,20.4c1.1,2.8,2.3,5.9,3.4,8.7h.3l8.3-29.1,4.8.7-10,32.8c-3.2,10.5-7.5,14-15,14h0Z"/><path d="M240.2,50.2v-31.3l-9.7.4.4-4.5h14.2v34.3c0,6.5,2.4,10,8.1,10s4.8-.5,6.5-1l.5,4.5c-1.7.5-4.5,1-7.4,1-9,0-12.6-5-12.6-13.3h0Z"/><path d="M270.5,47.1v-2.8c0-10.3,5.3-16.4,14.9-16.4s14.8,6.1,14.8,16.4v2.8c0,10.3-5.3,16.4-14.9,16.4s-14.8-6.1-14.8-16.4ZM285.4,59.2c6.7,0,10.1-4.2,10.1-12.1v-2.8c0-8-3.4-12.1-10-12.1s-10.1,4.1-10.1,12.1v2.8c0,8,3.4,12.1,10,12.1Z"/><path d="M318.5,32.5l-9.1.4.4-4.3h13l.2,9.7h.2c3.7-4.6,10.8-9.2,16.3-10.9l1.9,5.5c-6.5,1.5-13.2,5-18,9.4v20.6h-4.8v-30.3h-.1Z"/><path d="M386.3,39.8h12v19.8c-3,2.2-6.3,3.3-11.5,3.3-9.9,0-15.5-6-15.5-17v-9.6c0-10,5.7-16.9,16.1-16.9s7.5.4,9.6.7l-.7,4.2c-2.1-.3-5.3-.7-9.5-.7-6.7,0-10.7,4.8-10.7,12.6v9.6c0,8,4,12.8,11.1,12.8s4.5-.5,6.1-1.2v-13.7l-7.2.3s.2-4.2.2-4.2Z"/><path d="M414.8,46.6c.1,7.7,4,11.9,11.5,11.9s6.5-1,9.3-2.5l1.3,3.8c-3.4,2-6.9,3-11.1,3-9.8,0-15.7-5.8-15.7-16.5v-2.8c0-9.8,5.5-16.4,14.8-16.4s14.3,6.4,14.3,16.2v3.3h-24.4ZM434.3,42.8c-.2-7.3-3.6-11.4-9.6-11.4s-9.8,4-9.9,11.4h19.5Z"/><path d="M448.4,46.4v-2.8c0-10.3,5.3-16.4,14.9-16.4s14.8,6.1,14.8,16.4v2.8c0,10.3-5.3,16.4-14.9,16.4s-14.8-6.1-14.8-16.4ZM463.3,58.5c6.7,0,10.1-4.2,10.1-12.1v-2.8c0-8-3.4-12.1-10-12.1s-10.1,4.1-10.1,12.1v2.8c0,8,3.4,12.1,10,12.1Z"/><path d="M488.3,58.8l1.8-3.9c2.7,1.7,7.4,3.8,12.5,3.8s8.7-1.8,8.7-5.9-1.5-4.4-6.5-5.6l-6.8-1.7c-4.8-1.2-7.7-4-7.7-8.7s5-9.6,12.7-9.6,9.7,1.3,11.8,2.1l-1.2,4.1c-1.8-.8-6.2-2.1-10.6-2.1s-8.1,1.8-8.1,5.4,2,3.9,5.5,4.8l5.6,1.4c6.5,1.6,10,4,10,9.6s-5,10.4-13.5,10.4-11.7-2.1-14.2-4h0Z"/><path d="M533.4,60.2h-.3c.3,4,.3,7.7.3,11.6v4.1h-4.8V27.7h3.5l.5,3h0c2.3-1.9,6-3.6,10.5-3.6,8.7,0,12.7,5.9,12.7,15.7v3.3c0,10.3-4.9,16.7-14,16.7s-6.4-1.1-8.4-2.6ZM541.7,58.5c6,0,9.4-4.6,9.4-11.8v-3.8c0-7.7-3-11.8-9.6-11.8s-5.7.8-8,2v23.4c2.3,1.4,5.2,2,8.2,2h0Z"/><path d="M577.7,42.9l10.7-.6v-2c0-6.2-3.1-8.7-9.2-8.7s-8.1.8-10,1.3l-.4-4.4c1-.3,5.2-1.1,10.4-1.1,9.8,0,14,4.2,14,12.7v10.3c0,3.9.5,8,1.1,11.7l-3.6.6c-.6-2.5-1.1-5-1.4-7.5h-.2c-2.1,5.3-6.8,7.7-12.2,7.7s-10.9-4.2-10.9-10.4,3.3-9,11.8-9.4v-.2ZM577.7,58.7c5,0,10.6-3.4,10.6-9.1v-3.8l-9.4.6c-6.6.4-8.2,2.9-8.2,5.9,0,4.3,2.6,6.4,7,6.4h0Z"/><path d="M610.7,28v-9.4h4.9v9.3l17.4-.2-.6,4.3h-16.8c0-.1,0,19.3,0,19.3,0,4.6,2.7,7.3,8.2,7.3s6.2-.8,8.4-1.4l.4,4.2c-2.3.8-6.4,1.6-9.9,1.6-8.1,0-12-4-12-10.6v-20.4h-8.2c0,.1,0-3.9,0-3.9h8.2,0Z"/><path d="M654.3,50.3v-18.6l-11.3.4.3-4.3h15.9v21.5c0,5.7.9,9.1,6.1,9.1s4.8-.7,6.4-1.3l.8,4.1c-1.8.9-5,1.7-8.1,1.7-7,0-10-3.8-10-12.5h-.1ZM656.7,11.6c2.3,0,4,1.5,4,3.5s-1.7,3.7-4,3.7-3.9-1.6-3.9-3.7,1.7-3.5,3.9-3.5Z"/><path d="M693.6,42.9l10.7-.6v-2c0-6.2-3.1-8.7-9.2-8.7s-8.1.8-10,1.3l-.4-4.4c1-.3,5.2-1.1,10.4-1.1,9.8,0,14,4.2,14,12.7v10.3c0,3.9.5,8,1.1,11.7l-3.6.6c-.6-2.5-1.1-5-1.4-7.5h-.2c-2.1,5.3-6.8,7.7-12.2,7.7s-10.9-4.2-10.9-10.4,3.3-9,11.8-9.4v-.2ZM693.7,58.7c5,0,10.6-3.4,10.6-9.1v-3.8l-9.4.6c-6.6.4-8.2,2.9-8.2,5.9,0,4.3,2.6,6.4,7,6.4h0Z"/><path d="M729.4,49.5v-31.3l-9.7.4.4-4.5h14.2v34.3c0,6.5,2.4,10,8.1,10s4.8-.5,6.5-1l.5,4.5c-1.7.5-4.5,1-7.4,1-9,0-12.6-5-12.6-13.3h0Z"/><g><g><path d="M21.2,31.2l-8.8,8.8c-.3.3-.3.8,0,1.1l8.8,8.8c.6.6,1.5,0,1.3-.8-2-5.5-2-11.5,0-17,.3-.8-.7-1.4-1.3-.8h0Z"/><path d="M31.8,20.6l8.8-8.8c.3-.3.8-.3,1.1,0l8.8,8.8c.6.6,0,1.5-.8,1.3-5.5-2-11.5-2-17,0-.8.3-1.4-.7-.8-1.3h0Z"/><path d="M61.2,49.9l8.8-8.8c.3-.3.3-.8,0-1.1l-8.8-8.8c-.6-.6-1.5,0-1.3.8,2,5.5,2,11.5,0,17-.3.8.7,1.4,1.3.8h0Z"/><path d="M50.5,60.5l-8.8,8.8c-.3.3-.8.3-1.1,0l-8.8-8.8c-.6-.6,0-1.5.8-1.3,5.5,2,11.5,2,17,0,.8-.3,1.4.7.8,1.3h0Z"/></g><g><path d="M78.6,20.7V4.3c0-.5-.4-1-1-1h-16c-1,0-1.4,1.4-.4,1.9,7,3.2,12.5,8.8,15.5,15.9.4,1,1.9.7,1.9-.4Z"/><path d="M3.8,60.4v16.4c0,.5.4,1,1,1h16c1,0,1.4-1.4.4-1.9-7-3.2-12.5-8.8-15.5-15.9-.4-1-1.9-.7-1.9.4Z"/><path d="M61.2,77.8h16.4c.5,0,1-.4,1-1v-16c0-1-1.4-1.4-1.9-.4-3.2,7-8.8,12.5-15.9,15.5-1,.4-.7,1.9.4,1.9Z"/><path d="M21.2,3.3H4.8c-.5,0-1,.4-1,1v16c0,1,1.4,1.4,1.9.4,3.2-7,8.8-12.5,15.9-15.5s.7-1.9-.4-1.9Z"/></g></g></svg>
+<span class="tag" id="tag">Live poll</span>
+</header>
+
+<main id="pick">
+<h1>Guess the top 5</h1>
+<p class="lead">Tap 5 models, <b>best first</b>.</p>
+<ul class="grid" id="grid" aria-label="Models"></ul>
+<label class="f" for="name">Your name <span>· shown if you're closest</span></label>
+<input id="name" name="name" type="text" maxlength="30" autocomplete="name" autocapitalize="words" spellcheck="false" enterkeyhint="done" placeholder="First and last name">
+<button class="btn wait" id="submit" type="button">Pick 5 models</button>
+</main>
+
+<main id="done" hidden>
+<svg class="mark" viewBox="64 64 88 88" aria-hidden="true"><g class="a"><path d="M87.9,98.6l-8.8,8.8c-.3.3-.3.8,0,1.1l8.8,8.8c.6.6,1.6,0,1.3-.8-2.1-5.5-2.1-11.6,0-17,.3-.8-.7-1.4-1.3-.8Z"/><path d="M98.6,87.9l8.8-8.8c.3-.3.8-.3,1.1,0l8.8,8.8c.6.6,0,1.6-.8,1.3-5.5-2.1-11.6-2.1-17,0-.8.3-1.4-.7-.8-1.3Z"/><path d="M128.1,117.4l8.8-8.8c.3-.3.3-.8,0-1.1l-8.8-8.8c-.6-.6-1.6,0-1.3.8,2.1,5.5,2.1,11.6,0,17-.3.8.7,1.4,1.3.8Z"/><path d="M117.4,128.1l-8.8,8.8c-.3.3-.8.3-1.1,0l-8.8-8.8c-.6-.6,0-1.6.8-1.3,5.5,2.1,11.6,2.1,17,0,.8-.3,1.4.7.8,1.3Z"/></g><g class="c"><path d="M145.6,88v-16.5c0-.5-.4-1-1-1h-16.1c-1,0-1.4,1.4-.4,1.9,7,3.2,12.6,8.9,15.6,16,.4,1,1.9.7,1.9-.4Z"/><path d="M70.4,128v16.5c0,.5.4,1,1,1h16.1c1,0,1.4-1.4.4-1.9-7-3.2-12.6-8.9-15.6-16-.4-1-1.9-.7-1.9.4Z"/><path d="M128.1,145.4h16.5c.5,0,1-.4,1-1v-16.1c0-1-1.4-1.4-1.9-.4-3.2,7-8.9,12.6-16,15.6-1,.4-.7,1.9.4,1.9Z"/><path d="M87.9,70.6h-16.5c-.5,0-1,.4-1,1v16.1c0,1,1.4,1.4,1.9.4,3.2-7,8.9-12.6,16-15.6,1-.4.7-1.9-.4-1.9Z"/></g></svg>
+<h1>Locked in</h1>
+<p id="who"></p>
+<ol class="picks" id="picks"></ol>
+<div class="status" id="status" role="status" aria-live="polite"></div>
+<button class="btn ghost" id="change" type="button">Change picks</button>
+<p class="hint">Watch the screen for the reveal.</p>
+</main>
+</div>
+
+<script>
+window.CROWD_CONFIG = {
+// The form's POST endpoint: https://docs.google.com/forms/d/e/<FORM_ID>/formResponse ("viewform" swapped for "formResponse").
+formAction: "https://docs.google.com/forms/d/e/1FAIpQLScuCL3WdluWsOqfwb5LGCE4yD19xolNlJsRTzXrsapg6mZFnA/formResponse",
+
+// Google Form field ids, "entry.<number>", one per short-answer question titled exactly like the key.
+// rank1..rank5 hold model ids from crowd/models.json, best first.
+entries: {
+rank1: "entry.1224083048",  // model id guessed #1
+rank2: "entry.874932282",  // model id guessed #2
+rank3: "entry.132482363",  // model id guessed #3
+rank4: "entry.1527712062",  // model id guessed #4
+rank5: "entry.247129704",  // model id guessed #5
+name: "entry.442523175",   // the voter's name, trimmed, at most 30 characters
+device: "entry.1125182619"  // random id made once per phone (localStorage); the reveal keeps the last ballot per device
+},
+
+// Id of the Google Sheet linked to the form (from its URL: /spreadsheets/d/<sheetId>/edit). Read by the reveal slide.
+sheetId: "1jElv78R6gWOU8eOpgv-LjjMi3xoiSpGOKGJqrw4jzms",
+
+// Tab of that Sheet holding the responses, usually "Form Responses 1". Read by the reveal slide.
+sheetTab: "Form Responses 1",
+
+// TEMP public test URL (GitHub Pages); swap for the research.taylorgeospatial.org URL before the talk.
+// Public URL of the vote page, encoded in the QR code (e.g. https://research.taylorgeospatial.org/crowd/vote/).
+voteUrl: "https://maxlenormand.github.io/satsummit-top5-test/vote/",
+
+// ISO time voting opens, e.g. "2026-11-18T09:00:00-05:00". The reveal ignores rows stamped before it (rehearsals).
+// !! SET BEFORE THE TALK to the morning of 18 Nov 2026 (just before the QR slide). This pre-talk value lets test votes count.
+startTime: "2026-11-17T00:00:00-06:00"
+};
+</script>
+<script>
+window.CROWD_MODELS = {"models":[{"id":"deo","name":"DEO","model":"DEO Swin-B (RGB)"},{"id":"dofa","name":"DOFA","model":"DOFA Large"},{"id":"dinov3-sat","name":"DINOv3-SAT","model":"DINOv3-SAT ViT-L/16"},{"id":"panopticon","name":"Panopticon","model":"Panopticon"},{"id":"clay","name":"Clay","model":"Clay v1.5 Large"},{"id":"dinov3","name":"DINOv3","model":"DINOv3 ViT-L/16"},{"id":"olmoearth","name":"OlmoEarth","model":"OlmoEarth v1.3 Base"},{"id":"scale-mae","name":"Scale-MAE","model":"Scale-MAE Large"},{"id":"prithvi","name":"Prithvi-EO","model":"Prithvi-EO v2 600M"},{"id":"satlas","name":"SatlasNet","model":"SatlasNet SwinV2-B (NAIP, multi-image)"}]};
+</script>
+<script>
+(function () {
+"use strict";
+var MAX = 5, RETRY_MS = 8000, TIMEOUT_MS = 15000, NAME_MAX = 30;
+// Fallback when crowd/models.json can't be loaded (and in dev before it exists). Display fields only: never ranks.
+var FALLBACK = [
+{ id: "deo", name: "DEO", model: "DEO Swin-B (RGB)" },
+{ id: "dofa", name: "DOFA", model: "DOFA Large" },
+{ id: "dinov3-sat", name: "DINOv3-SAT", model: "DINOv3-SAT ViT-L/16" },
+{ id: "panopticon", name: "Panopticon", model: "Panopticon" },
+{ id: "clay", name: "Clay", model: "Clay v1.5 Large" },
+{ id: "dinov3", name: "DINOv3", model: "DINOv3 ViT-L/16" },
+{ id: "olmoearth", name: "OlmoEarth", model: "OlmoEarth v1.3 Base" },
+{ id: "scale-mae", name: "Scale-MAE", model: "Scale-MAE Large" },
+{ id: "prithvi", name: "Prithvi-EO", model: "Prithvi-EO v2 600M" },
+{ id: "satlas", name: "SatlasNet", model: "SatlasNet SwinV2-B (NAIP, multi-image)" }
+];
+
+var CFG = window.CROWD_CONFIG || {};
+var Q = new URLSearchParams(location.search);
+var DRY = !CFG.formAction || CFG.formAction === "TODO" || Q.has("dry");
+var K = { dev: "crowd.device", ballot: "crowd.ballot", dry: "crowd.dryrun" };
+var $ = function (id) { return document.getElementById(id); };
+
+// ---- storage (private mode / blocked storage must not break the page)
+function get(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+function set(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
+function del(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
+function getJSON(k) { try { return JSON.parse(get(k)); } catch (e) { return null; } }
+
+if (Q.has("reset")) { del(K.ballot); del(K.dev); del(K.dry); history.replaceState(null, "", location.pathname); }
+
+function rid() {
+var a = new Uint8Array(8), s = "";
+try { crypto.getRandomValues(a); } catch (e) { for (var j = 0; j < 8; j++) a[j] = Math.random() * 256; }
+for (var i = 0; i < 8; i++) s += (a[i] % 36).toString(36);
+return "d" + Date.now().toString(36).slice(-4) + s;
+}
+var device = get(K.dev);
+if (!device) { device = rid(); set(K.dev, device); }
+
+function hash(str) { // FNV-1a, for the per-device shuffle
+var h = 2166136261;
+for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+return h >>> 0;
+}
+function clean(list) {
+var out = [];
+(list || []).forEach(function (m) {
+if (m && m.id && m.name) out.push({ id: String(m.id), name: String(m.name), model: m.model ? String(m.model) : "" });
+});
+return out.length >= MAX ? out : null;
+}
+
+var models = [], byId = {}, picks = [], ballot = getJSON(K.ballot), inflight = false, timer = null;
+var grid = $("grid"), nameEl = $("name"), submitEl = $("submit");
+
+// ---- picking
+function render() {
+grid.innerHTML = "";
+models.forEach(function (m) {
+var li = document.createElement("li");
+var b = document.createElement("button");
+b.type = "button"; b.className = "card"; b.dataset.id = m.id;
+var sub = m.model && m.model !== m.name ? '<span class="md"></span>' : "";
+b.innerHTML = '<span class="nm"></span>' + sub + '<span class="badge" aria-hidden="true"></span>';
+b.querySelector(".nm").textContent = m.name;
+if (sub) b.querySelector(".md").textContent = m.model;
+b.addEventListener("click", function () { tap(m.id); });
+li.appendChild(b); grid.appendChild(li);
+});
+paint(null);
+}
+function tap(id) {
+var i = picks.indexOf(id);
+if (i >= 0) { picks.splice(i, 1); paint(i); }
+else if (picks.length < MAX) {
+picks.push(id); paint(null);
+buzz(8);
+if (picks.length === MAX && !nameEl.value.trim()) reveal(nameEl);
+} else { nudge(grid); buzz([6, 40, 6]); }
+}
+function paint(removedAt) {
+var cards = grid.querySelectorAll(".card");
+for (var k = 0; k < cards.length; k++) {
+var c = cards[k], i = picks.indexOf(c.dataset.id), on = i >= 0, badge = c.querySelector(".badge");
+var was = c.getAttribute("aria-pressed") === "true", old = badge.textContent;
+c.setAttribute("aria-pressed", on ? "true" : "false");
+badge.textContent = on ? String(i + 1) : "";
+if (i === 0) c.setAttribute("data-first", ""); else c.removeAttribute("data-first");
+c.setAttribute("aria-label", byId[c.dataset.id].name + (on ? ", pick " + (i + 1) : ""));
+if (on && was && removedAt !== null && old !== badge.textContent) { // renumbered: small bump
+badge.classList.remove("bump"); void badge.offsetWidth; badge.classList.add("bump");
+}
+}
+grid.classList.toggle("full", picks.length === MAX);
+updateSubmit();
+}
+function cleanName(v) { return String(v || "").replace(/\s+/g, " ").trim().slice(0, NAME_MAX); }
+function updateSubmit() {
+var left = MAX - picks.length, nm = cleanName(nameEl.value);
+submitEl.textContent = left === MAX ? "Pick 5 models" : left > 0 ? "Pick " + left + " more" : !nm ? "Add your name" : "Lock in my top 5";
+submitEl.classList.toggle("wait", left > 0 || !nm);
+}
+function nudge(el) { el.classList.remove("nudge"); void el.offsetWidth; el.classList.add("nudge"); setTimeout(function () { el.classList.remove("nudge"); }, 600); }
+function buzz(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+function reveal(el) {
+var r = el.getBoundingClientRect();
+if (r.bottom > window.innerHeight - 70) {
+try { submitEl.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "end" }); }
+catch (e) { submitEl.scrollIntoView(false); }
+}
+}
+nameEl.addEventListener("input", updateSubmit);
+nameEl.addEventListener("keydown", function (e) { if (e.key === "Enter") { nameEl.blur(); submit(); } });
+submitEl.addEventListener("click", submit);
+
+function submit() {
+if (picks.length < MAX) { nudge(grid); return; }
+var nm = cleanName(nameEl.value);
+if (!nm) { nudge(nameEl); nameEl.focus(); return; }
+nameEl.value = nm;
+ballot = { picks: picks.slice(), name: nm, device: device, seq: ((ballot && ballot.seq) || 0) + 1, ts: Date.now(), sent: 0 };
+set(K.ballot, JSON.stringify(ballot)); // saved on the phone first, then sent
+showDone(true);
+flush();
+}
+
+// ---- locked in
+function showDone(animate) {
+$("pick").hidden = true; $("done").hidden = false;
+$("who").textContent = ballot.name;
+var ol = $("picks"); ol.innerHTML = "";
+ballot.picks.forEach(function (id, i) {
+var m = byId[id] || { name: id, model: "" };
+var li = document.createElement("li");
+li.innerHTML = '<span class="n"></span><span class="t"><b></b><i></i></span>';
+li.querySelector(".n").textContent = String(i + 1);
+li.querySelector("b").textContent = m.name;
+li.querySelector("i").textContent = m.model && m.model !== m.name ? m.model : "";
+li.style.animationDelay = (0.25 + i * 0.06) + "s";
+ol.appendChild(li);
+});
+var d = $("done"); d.classList.remove("go");
+if (animate) { void d.offsetWidth; d.classList.add("go"); }
+window.scrollTo(0, 0);
+status();
+}
+$("change").addEventListener("click", function () {
+picks = ballot.picks.slice(); nameEl.value = ballot.name;
+$("done").hidden = true; $("pick").hidden = false; paint(null); window.scrollTo(0, 0);
+});
+function status() {
+var s = $("status"), st, txt;
+if (!ballot) return;
+if (ballot.sent === ballot.seq) { st = ballot.dry ? "dry" : "sent"; txt = ballot.dry ? "Saved · dry run" : "Sent"; }
+else if (inflight) { st = "sending"; txt = "Sending…"; }
+else { st = "wait"; txt = "Saved · sending when online"; }
+s.dataset.s = st; s.textContent = txt;
+}
+
+// ---- send queue: retry on `online`, on return to the page and every 8 s until a send resolves
+function payload(b) {
+var e = CFG.entries || {}, p = new URLSearchParams();
+var key = function (k) { return e[k] && e[k] !== "TODO" ? e[k] : k; }; // dry run: readable keys
+for (var i = 0; i < MAX; i++) p.append(key("rank" + (i + 1)), b.picks[i] || "");
+p.append(key("name"), b.name);
+p.append(key("device"), b.device);
+return p;
+}
+function markSent(seq, dry) {
+var cur = getJSON(K.ballot) || ballot;
+if (cur && cur.seq === seq) { cur.sent = seq; cur.dry = dry ? 1 : 0; ballot = cur; set(K.ballot, JSON.stringify(cur)); }
+else if (ballot && ballot.seq === seq) { ballot.sent = seq; ballot.dry = dry ? 1 : 0; }
+}
+function schedule() { clearTimeout(timer); timer = setTimeout(flush, RETRY_MS); }
+function flush() {
+if (!ballot || ballot.sent === ballot.seq || inflight) { status(); return; }
+var b = ballot, body = payload(b);
+if (DRY) {
+inflight = true; status();
+console.log("[crowd vote] dry run, would POST to", CFG.formAction, body.toString());
+var log = getJSON(K.dry) || []; log.push({ ts: Date.now(), body: body.toString() }); set(K.dry, JSON.stringify(log.slice(-20)));
+setTimeout(function () { inflight = false; markSent(b.seq, true); status(); }, 450);
+return;
+}
+if (navigator.onLine === false) { status(); schedule(); return; }
+if (!window.fetch) { // very old browsers: the beacon is the only way
+if (beacon(b)) markSent(b.seq, false); else schedule();
+status(); return;
+}
+inflight = true; status();
+var ctl = window.AbortController ? new AbortController() : null;
+var guard = setTimeout(function () { if (ctl) ctl.abort(); }, TIMEOUT_MS);
+fetch(CFG.formAction, {
+method: "POST", mode: "no-cors", credentials: "omit", cache: "no-store", keepalive: true,
+headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body.toString(),
+signal: ctl ? ctl.signal : undefined
+}).then(function () { // opaque response = it reached Google
+clearTimeout(guard); inflight = false; markSent(b.seq, false); status();
+if (ballot.sent !== ballot.seq) flush(); // changed picks meanwhile
+}, function () {
+clearTimeout(guard); inflight = false; status(); schedule();
+});
+}
+var beaconed = 0;
+function beacon(b) {
+try {
+if (DRY || inflight || !navigator.sendBeacon || navigator.onLine === false || beaconed === b.seq) return false; // a keepalive fetch in flight finishes anyway
+beaconed = b.seq;
+return navigator.sendBeacon(CFG.formAction, new Blob([payload(b).toString()], { type: "application/x-www-form-urlencoded" }));
+} catch (e) { return false; }
+}
+window.addEventListener("online", flush);
+document.addEventListener("visibilitychange", function () {
+if (document.visibilityState === "visible") flush();
+else if (ballot && ballot.sent !== ballot.seq) beacon(ballot); // leaving with an unsent ballot: one last try
+});
+window.addEventListener("pagehide", function () { if (ballot && ballot.sent !== ballot.seq) beacon(ballot); });
+setInterval(function () { if (ballot && ballot.sent !== ballot.seq && !inflight) flush(); }, RETRY_MS);
+
+// ---- start
+function start(list) {
+models = (clean(list) || FALLBACK).slice();
+byId = {}; models.forEach(function (m) { byId[m.id] = m; });
+models.sort(function (a, b) { return hash(device + ":" + a.id) - hash(device + ":" + b.id); }); // stable per phone
+if (DRY) $("tag").textContent = "Dry run";
+render();
+if (ballot && ballot.picks && ballot.name) {
+ballot.picks = ballot.picks.filter(function (id) { return byId[id]; });
+if (ballot.picks.length === MAX) { showDone(false); flush(); return; }
+ballot = null; del(K.ballot);
+}
+}
+if (window.CROWD_MODELS) start(window.CROWD_MODELS.models || window.CROWD_MODELS);
+else if (window.fetch) {
+var done = false, go = function (l) { if (!done) { done = true; start(l); } };
+setTimeout(function () { go(null); }, 4000);
+fetch("../models.json", { cache: "no-store" }).then(function (r) { return r.json(); })
+.then(function (j) { go(j && j.models); }, function () { go(null); });
+} else start(null);
+
+// test hook (headless checks): state without the UI
+window.__crowd = { get ballot() { return ballot; }, get picks() { return picks.slice(); }, flush: flush, dry: DRY, device: device };
+})();
+</script>
+</body>
+</html>
